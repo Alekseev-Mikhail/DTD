@@ -7,7 +7,7 @@
 const char *const INFO = GREEN_C "INFO" RESET_C;
 const char *const ERROR = RED_C "ERROR" RESET_C;
 
-void putLogMessage(const char *const level, const char *const format, const char *const module, va_list args) {
+void glog(const char *const level, const char *const format, const char *const module, va_list args) {
     time_t rawTime;
     time(&rawTime);
     const struct tm *timeInfo = localtime(&rawTime);

@@ -10,6 +10,6 @@
 extern const char *const INFO;
 extern const char *const ERROR;
 
-void putLogMessage(const char *level, const char *format, const char *module, va_list args);
+void glog(const char *level, const char *format, const char *module, va_list args);
 
 #endif //LOG_H
