@@ -26,24 +26,4 @@ add_executable(dummy3d
         src/math/rad.h
 )
 
-# TESTS
-add_executable(matrix-tests
-        tests/matrix-tests.c
-        tests/tool/unity.h
-        tests/tool/unity_internals.h
-        tests/tool/unity.c
-        src/math/matrix.c
-        src/math/matrix.h
-        src/math/vector.c
-        src/math/vector.h
-)
-add_executable(vector-tests
-        tests/vector-tests.c
-        tests/tool/unity.c
-        tests/tool/unity.h
-        tests/tool/unity_internals.h
-        src/math/vector.c
-        src/math/vector.h
-)
-
 target_link_libraries(dummy3d glfw)

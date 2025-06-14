@@ -55,68 +55,6 @@ static void checkShaderCompilation(WindowData *const win, const GLuint shader) {
     }
 }
 
-static GLchar *getShaderSource(WindowData *const win, const char *const filename) {
-    const unsigned pathLength = strlen(resourceDirectory) + strlen(shaderDirectory) + strlen(filename) + 1;
-    char path[pathLength];
-    snprintf(path, pathLength, "%s%s%s", resourceDirectory, shaderDirectory, filename);
-
-    FILE *file = fopen(path, "r");
-    if (file == NULL) {
-        llog(ERROR, "Failed to open a shader source. %s: %s", strerror(errno), path);
-        win_disposeAndAbort(win);
-    }
-
-    fseek(file, 0, SEEK_END);
-    const int size = (int) ftell(file);
-    fseek(file, 0, SEEK_SET);
-    char *source = malloc((size + 1) * sizeof(char));
-
-    fread(source, sizeof(char), size, file);
-    source[size] = '\0';
-
-    fclose(file);
-    return source;
-}
-
-static void compileShaders(WindowData *const win) {
-    const GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    const GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-
-    llog(INFO, "Getting shader sources");
-    const GLchar *const vertSource = getShaderSource(win, "s.vert");
-    const GLchar *const fragSource = getShaderSource(win, "s.frag");
-
-    llog(INFO, "Compiling a vertex shader");
-    glShaderSource(vertexShader, 1, &vertSource, NULL);
-    glCompileShader(vertexShader);
-    checkShaderCompilation(win, vertexShader);
-
-    llog(INFO, "Compiling a fragment shader");
-    glShaderSource(fragmentShader, 1, &fragSource, NULL);
-    glCompileShader(fragmentShader);
-    checkShaderCompilation(win, fragmentShader);
-
-    llog(INFO, "Creating a shader program");
-    win->_shaderProgram = glCreateProgram();
-    llog(INFO, "Attaching the shaders to the program");
-    glAttachShader(win->_shaderProgram, vertexShader);
-    glAttachShader(win->_shaderProgram, fragmentShader);
-    llog(INFO, "Linking the shader program");
-    glLinkProgram(win->_shaderProgram);
-    checkShaderProgramLinking(win);
-
-    llog(INFO, "Detaching the shaders from the program");
-    glDetachShader(win->_shaderProgram, vertexShader);
-    glDetachShader(win->_shaderProgram, fragmentShader);
-
-    llog(INFO, "Deleting the shaders");
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
-    free((void *) vertSource);
-    free((void *) fragSource);
-}
-
 static void render(const WindowData *const win, const GLint mvpUniform, const GLuint vertexBuffer) {
     glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(win->_shaderProgram);
@@ -141,20 +79,21 @@ static void render(const WindowData *const win, const GLint mvpUniform, const GL
     glDisableVertexAttribArray(0);
 }
 
-void win_initWindow(WindowData *const win, const int width, const int height, const char *title) {
+WindowData *win_init(const int width, const int height, const char *title) {
     llog(INFO, "Initializing GLFW");
     if (!glfwInit()) {
         llog(ERROR, "Failed to initialize GLFW");
-        free(win);
         abort();
     }
 
     llog(INFO, "Creating GLFW window");
+    WindowData *win = malloc(sizeof(WindowData));
     win->id = glfwCreateWindow(width, height, title, NULL, NULL);
     win->width = width;
     win->height = height;
     win->camera = cam_allocate();
     win->camera->aspect = (float) width / (float) height;
+    win->envDisposer = NULL;
     if (NULL == win->id) {
         llog(ERROR, "Failed to create GLFW window");
         glfwTerminate();
@@ -168,8 +107,41 @@ void win_initWindow(WindowData *const win, const int width, const int height, co
     glfwGetFramebufferSize(win->id, &viewportWidth, &viewportHeight);
     glViewport(0, 0, viewportWidth, viewportHeight);
     glfwSwapInterval(1);
+    return win;
+}
 
-    compileShaders(win);
+void win_compileShaders(WindowData *const win, const Shader shaders[], const size_t count) {
+    GLuint shaderIds[count];
+
+    for (int i = 0; i < count; i++) {
+        Shader const shader = shaders[i];
+        const GLuint shaderId = glCreateShader(shader.type);
+        shaderIds[i] = shaderId;
+
+        llog(INFO, "Compiling (%s) shader", shader.filename);
+        glShaderSource(shaderId, 1, &shader.source, NULL);
+        glCompileShader(shaderId);
+        checkShaderCompilation(win, shaderId);
+    }
+
+    llog(INFO, "Creating a shader program");
+    win->_shaderProgram = glCreateProgram();
+    llog(INFO, "Attaching the shaders to the program");
+    for (int i = 0; i < count; i++) {
+        glAttachShader(win->_shaderProgram, shaderIds[i]);
+    }
+    llog(INFO, "Linking the shader program");
+    glLinkProgram(win->_shaderProgram);
+    checkShaderProgramLinking(win);
+
+    for (int i = 0; i < count; i++) {
+        const Shader shader = shaders[i];
+        const GLuint shaderId = shaderIds[i];
+        llog(INFO, "Detaching the (%s) shader from the program", shader.filename);
+        glDetachShader(win->_shaderProgram, shaderId);
+        llog(INFO, "Deleting the (%s) shader", shader.filename);
+        glDeleteShader(shaderId);
+    }
 }
 
 void win_startRenderCycle(const WindowData *const win) {
@@ -239,9 +211,10 @@ void win_disposeAndAbort(WindowData *const win) {
 }
 
 void win_dispose(WindowData *const win) {
-    llog(INFO, "Application was shut down properly");
+    if (win->envDisposer != NULL) win->envDisposer();
     glfwDestroyWindow(win->id);
     cam_dispose(win->camera);
     free(win);
     glfwTerminate();
+    llog(INFO, "Application was shut down properly");
 }
