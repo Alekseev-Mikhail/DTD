@@ -41,7 +41,7 @@ int main(const int argc, char **argv) {
     setShaderInfoFromArguments(argc, argv);
 
     llog(INFO, "Initializing window");
-    WindowData *win = win_init(500, 500, "Hiya, OpenGL!");
+    WindowData *win = win_init(1000, 700, "Hiya, OpenGL!");
 
     llog(INFO, "Starting compiling shaders");
     setupShaderCompiling(win);
