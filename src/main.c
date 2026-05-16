@@ -1,5 +1,4 @@
 #include <dirent.h>
-#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,21 +6,16 @@
 
 #include "window.h"
 #include "math/rad.h"
+#include "utility/exception.h"
 #include "utility/log.h"
 
-static size_t shaderCount;
-static Shader *shaders;
-static char **shaderFilenames;
+static const char DEFAULT_ARGUMENTS_NUMBER = 1;
 
-void setShaderInfoFromArguments(int argc, char **argv);
+void intiShaderRegister(WindowData *win, int argc, char **argv);
 
-static char *getShaderSource(WindowData *win, const char *filename);
+bool getExeDirectoryPath(char **exeDirPath, const char *exePath);
 
-static GLenum getShaderType(const char *filename);
-
-void setupShaderCompiling(WindowData *win);
-
-static void disposeShaders();
+bool setDirectoryPath(WindowData *win, const char **directoryPath, const char *pathToOrigin, const char *relativePath);
 
 __attribute__ ((format(printf, 2, 3)))
 static void llog(const char *const level, char *const format, ...) {
@@ -32,23 +26,38 @@ static void llog(const char *const level, char *const format, ...) {
 }
 
 int main(const int argc, char **argv) {
-    llog(INFO, "Getting program arguments");
-    if (argc < 3) {
-        llog(ERROR, "Not enough arguments");
-        abort();
-    }
-    resourceDirectory = argv[1];
-    setShaderInfoFromArguments(argc, argv);
-
     llog(INFO, "Initializing window");
     WindowData *win = win_init(1000, 700, "Hiya, OpenGL!");
+    llog(INFO, "Initializing shader register");
+    intiShaderRegister(win, argc, argv);
 
-    llog(INFO, "Starting compiling shaders");
-    setupShaderCompiling(win);
-    win->envDisposer = disposeShaders;
-    win_compileShaders(win, shaders, shaderCount);
-    disposeShaders(shaders, shaderCount);
-    win->envDisposer = NULL;
+    if (argc < 1) {
+        llog(ERROR, "Not enough arguments");
+        win_disposeAndAbort(win);
+    }
+
+    llog(DEBUG, "Getting program arguments");
+    char *exeDirPath = NULL;
+    if (false == getExeDirectoryPath(&exeDirPath, argv[0])) {
+        llog(FATAL, "Failed to get path, where executable is located");
+        win_disposeAndAbort(win);
+    }
+    llog(DEBUG, "Working directory: %s", exeDirPath);
+
+    if (false == setDirectoryPath(win, &win->shaderRegister->shaderDirectory, exeDirPath, "resources/shaders/")) {
+        llog(FATAL, "Cannot get shader directory path");
+        win_disposeAndAbort(win);
+    }
+    llog(DEBUG, "Shaders directory: %s", win->shaderRegister->shaderDirectory);
+    free(exeDirPath);
+
+    llog(INFO, "Registering and compiling shaders");
+    llog(DEBUG, "Registering shaders");
+    win_registerShaders(win);
+    llog(DEBUG, "Compiling shaders");
+    win_compileShaders(win);
+    llog(INFO, "Disposing shader register");
+    win_disposeShaderRegister(win);
 
     cam_setPrefs(win->camera, toRad(75), 0.1f, 100.0f);
     cam_move(win->camera, -3, 3, -3);
@@ -59,96 +68,60 @@ int main(const int argc, char **argv) {
 
     llog(INFO, "Shutting down application");
     win_dispose(win);
+    llog(INFO, "Application was shut down properly");
     return 0;
 }
 
-void setShaderInfoFromArguments(const int argc, char **argv) {
-    char *endP;
-    shaderCount = strtol(argv[2], &endP, 10);
-    if (*endP != '\0') {
-        llog(ERROR, "Cannot read shader count as second argument");
-        abort();
-    }
-    if (argc < 3 + shaderCount) {
-        llog(ERROR, "Not enough shader filenames");
-        abort();
-    }
-    shaderFilenames = malloc(shaderCount * sizeof(char *));
-    for (int i = 0; i < shaderCount; i++) {
-        shaderFilenames[i] = argv[3 + i];
-    }
-}
-
-static char *getShaderSource(WindowData *const win, const char *const filename) {
-    const unsigned pathLength = strlen(resourceDirectory) + strlen(shaderDirectory) + strlen(filename) + 1;
-    char path[pathLength];
-    snprintf(path, pathLength, "%s%s%s", resourceDirectory, shaderDirectory, filename);
-
-    FILE *file = fopen(path, "r");
-    if (file == NULL) {
-        llog(ERROR, "Failed to open a shader source. %s: %s", strerror(errno), path);
+void intiShaderRegister(WindowData *const win, const int argc, char **argv) {
+    if (true == IS_NULL(win) || true == IS_NULL(argv)) {
+        llog(FATAL, "Cannot create new shader register");
         win_disposeAndAbort(win);
     }
 
-    fseek(file, 0, SEEK_END);
-    const int size = (int) ftell(file);
-    fseek(file, 0, SEEK_SET);
-    char *source = malloc((size + 1) * sizeof(char));
+    win->shaderRegister = malloc(sizeof(ShaderRegister));
 
-    fread(source, sizeof(char), size, file);
-    source[size] = '\0';
+    win->shaderRegister->shaderCount = argc - 1;
+    llog(DEBUG, "Shader count: %zu", win->shaderRegister->shaderCount);
+    if (argc < 1 + win->shaderRegister->shaderCount) {
+        llog(ERROR, "Not enough shader filenames");
+        abort();
+    }
+    win->shaderRegister->shaderFilenames = malloc(win->shaderRegister->shaderCount * sizeof(char *));
+    for (int i = 0; i < win->shaderRegister->shaderCount; i++) {
+        win->shaderRegister->shaderFilenames[i] = argv[DEFAULT_ARGUMENTS_NUMBER + i];
+    }
 
-    fclose(file);
-    return source;
+    win->shaderRegister->shaders = malloc(win->shaderRegister->shaderCount * sizeof(Shader));
 }
 
-static GLenum getShaderType(const char *const filename) {
-    char temp[strlen(filename) + 1];
-    strcpy(temp, filename);
-    strtok(temp, ".");
-    const char *const token = strtok(NULL, ".");
-    if (token != NULL) {
-        if (strcmp(token, "vert") == 0) {
-            return GL_VERTEX_SHADER;
-        }
-        if (strcmp(token, "frag") == 0) {
-            return GL_FRAGMENT_SHADER;
-        }
-        if (strcmp(token, "geom") == 0) {
-            return GL_GEOMETRY_SHADER;
-        }
-        if (strcmp(token, "tesc") == 0) {
-            return GL_TESS_CONTROL_SHADER;
-        }
-        if (strcmp(token, "tese") == 0) {
-            return GL_TESS_EVALUATION_SHADER;
-        }
+bool getExeDirectoryPath(char **const exeDirPath, const char *const exePath) {
+    if (exeDirPath == NULL || exePath == NULL) {
+        llog(ERROR, "Null pointer exception");
+        return false;
     }
-    return GL_NONE;
+
+    const int exePathLength = (int)strlen(exePath);
+    unsigned int exeNameLength = 0;
+    for (int i = exePathLength - 1; i >= 0; i--) {
+        if (exePath[i] == '/') break;
+        exeNameLength++;
+    }
+
+    const unsigned int exeDirPathBufferSize = (exePathLength - exeNameLength + 1) * sizeof(char);
+    *exeDirPath = malloc(exeDirPathBufferSize);
+    snprintf(*exeDirPath, exeDirPathBufferSize, "%s", exePath);
+    return true;
 }
 
-void setupShaderCompiling(WindowData *const win) {
-    shaders = malloc(shaderCount * sizeof(Shader));
-    for (int i = 0; i < shaderCount; i++) {
-        char *const filename = shaderFilenames[i];
-        const GLenum type = getShaderType(filename);
-
-        llog(INFO, "Getting shader source: %s", filename);
-
-        if (type == GL_NONE) {
-            llog(ERROR, "Unknown shader type for %s", filename);
-            win_disposeAndAbort(win);
-        }
-        const Shader shader = {filename, getShaderSource(win, filename), type};
-        shaders[i] = shader;
+bool setDirectoryPath(WindowData *const win, const char **const directoryPath, const char *const pathToOrigin, const char *const relativePath) {
+    if (true == IS_NULL(win) || true == IS_NULL(directoryPath) || true == IS_NULL(pathToOrigin) || true == IS_NULL(relativePath)) {
+        llog(FATAL, "Unable to set directory path based on relative path");
+        win_disposeAndAbort(win);
     }
-}
 
-static void disposeShaders() {
-    llog(INFO, "Disposing shaders' sources");
-    for (int i = 0; i < shaderCount; ++i) {
-        free((void *) shaders[i].source);
-    }
-    free(shaderFilenames);
-    free(shaders);
+    const size_t directoryLength = strlen(pathToOrigin) + strlen(relativePath) + 1;
+    *directoryPath = malloc(directoryLength * sizeof(char));
+    const int result = snprintf((char *)*directoryPath, directoryLength, "%s%s", pathToOrigin, relativePath);
+    if (result > 0 && result < directoryLength) return true;
+    return false;
 }

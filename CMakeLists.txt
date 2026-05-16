@@ -6,12 +6,12 @@ set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
-add_subdirectory(glfw-source)
-include_directories(SYSTEM glad/include)
+add_subdirectory(third-party/glfw)
+include_directories(SYSTEM third-party/glad/include)
 
 add_executable(dummy3d
         src/main.c
-        glad/src/glad.c
+        third-party/glad/src/glad.c
         src/window.c
         src/window.h
         src/utility/log.c
@@ -24,6 +24,7 @@ add_executable(dummy3d
         src/camera.h
         src/math/rad.c
         src/math/rad.h
+        src/utility/exception.h
 )
 
 target_link_libraries(dummy3d glfw)

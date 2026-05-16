@@ -10,10 +10,12 @@
 #include "GLFW/glfw3.h"
 #include "math/matrix.h"
 #include "math/rad.h"
+#include "utility/exception.h"
 #include "utility/log.h"
 
-const char *resourceDirectory = "";
-const char *shaderDirectory = "shaders/";
+static GLenum getShaderType(WindowData *win, const char *filename);
+
+static char *getShaderSource(WindowData *win, const char *filename);
 
 __attribute__ ((format(printf, 2, 3)))
 static void llog(const char *const level, char *const format, ...) {
@@ -101,7 +103,7 @@ WindowData *win_init(const int width, const int height, const char *title) {
     win->height = height;
     win->camera = cam_allocate();
     win->camera->aspect = (float) height / (float) width;
-    win->envDisposer = NULL;
+    win->shaderRegister = NULL;
     if (NULL == win->id) {
         llog(ERROR, "Failed to create GLFW window");
         glfwTerminate();
@@ -120,15 +122,85 @@ WindowData *win_init(const int width, const int height, const char *title) {
     return win;
 }
 
-void win_compileShaders(WindowData *const win, const Shader shaders[], const size_t count) {
+void win_registerShaders(WindowData *const win) {
+    for (int i = 0; i < win->shaderRegister->shaderCount; i++) {
+        char *const filename = win->shaderRegister->shaderFilenames[i];
+        const GLenum type = getShaderType(win, filename);
+
+        if (type == GL_NONE) {
+            llog(FATAL, "Unknown shader type for %s", filename);
+            win_disposeAndAbort(win);
+        }
+        const Shader shader = {filename, getShaderSource(win, filename), type};
+        win->shaderRegister->shaders[i] = shader;
+
+        llog(INFO, "Shader was registered: %s", filename);
+    }
+}
+
+static GLenum getShaderType(WindowData *const win, const char *const filename) {
+    if (true == IS_NULL(filename)) {
+        llog(FATAL, "Shader file name is undefined");
+        win_disposeAndAbort(win);
+    }
+    char temp[strlen(filename) + 1];
+    strcpy(temp, filename);
+    strtok(temp, ".");
+    const char *const token = strtok(NULL, ".");
+    if (token != NULL) {
+        if (strcmp(token, "vert") == 0) {
+            return GL_VERTEX_SHADER;
+        }
+        if (strcmp(token, "frag") == 0) {
+            return GL_FRAGMENT_SHADER;
+        }
+        if (strcmp(token, "geom") == 0) {
+            return GL_GEOMETRY_SHADER;
+        }
+        if (strcmp(token, "tesc") == 0) {
+            return GL_TESS_CONTROL_SHADER;
+        }
+        if (strcmp(token, "tese") == 0) {
+            return GL_TESS_EVALUATION_SHADER;
+        }
+    }
+    return GL_NONE;
+}
+
+static char *getShaderSource(WindowData *const win, const char *const filename) {
+    const unsigned pathLength = strlen(win->shaderRegister->shaderDirectory) + strlen(filename) + 1;
+    char path[pathLength];
+    snprintf(path, pathLength, "%s%s", win->shaderRegister->shaderDirectory, filename);
+    llog(DEBUG, "Shader path: %s", path);
+
+    FILE *file = fopen(path, "r");
+    if (file == NULL) {
+        llog(ERROR, "Failed to open a shader source. %s: %s", strerror(errno), path);
+        win_disposeAndAbort(win);
+    }
+
+    fseek(file, 0, SEEK_END);
+    const int size = (int) ftell(file);
+    fseek(file, 0, SEEK_SET);
+    char *source = malloc((size + 1) * sizeof(char));
+
+    fread(source, sizeof(char), size, file);
+    source[size] = '\0';
+
+    fclose(file);
+    return source;
+}
+
+void win_compileShaders(WindowData *const win) {
+    const size_t count = win->shaderRegister->shaderCount;
     GLuint shaderIds[count];
 
     for (int i = 0; i < count; i++) {
-        Shader const shader = shaders[i];
+        Shader const shader = win->shaderRegister->shaders[i];
         const GLuint shaderId = glCreateShader(shader.type);
         shaderIds[i] = shaderId;
 
-        llog(INFO, "Compiling (%s) shader", shader.filename);
+        llog(INFO, "Compiling shader: %s", shader.filename);
         glShaderSource(shaderId, 1, &shader.source, NULL);
         glCompileShader(shaderId);
         checkShaderCompilation(win, shaderId);
@@ -144,12 +216,13 @@ void win_compileShaders(WindowData *const win, const Shader shaders[], const siz
     glLinkProgram(win->_shaderProgram);
     checkShaderProgramLinking(win);
 
+    llog(INFO, "Detaching and deleting shaders");
     for (int i = 0; i < count; i++) {
-        const Shader shader = shaders[i];
+        const Shader shader = win->shaderRegister->shaders[i];
         const GLuint shaderId = shaderIds[i];
-        llog(INFO, "Detaching the (%s) shader from the program", shader.filename);
+        llog(DEBUG, "Detaching shader from the program: %s", shader.filename);
         glDetachShader(win->_shaderProgram, shaderId);
-        llog(INFO, "Deleting the (%s) shader", shader.filename);
+        llog(DEBUG, "Deleting shader: %s", shader.filename);
         glDeleteShader(shaderId);
     }
 }
@@ -257,17 +330,33 @@ void win_startRenderCycle(const WindowData *const win) {
     }
 }
 
-void win_disposeAndAbort(WindowData *const win) {
-    llog(ERROR, "Aborting with unknown exception");
-    win_dispose(win);
-    abort();
-}
-
 void win_dispose(WindowData *const win) {
-    if (win->envDisposer != NULL) win->envDisposer();
+    if (true == IS_NULL(win)) {
+        llog(FATAL, "CRITICAL: windows object pointer is NULL when disposing it");
+        abort();
+    }
+    if (win->shaderRegister != NULL) win_disposeShaderRegister(win);
     glfwDestroyWindow(win->id);
     cam_dispose(win->camera);
     free(win);
     glfwTerminate();
-    llog(INFO, "Application was shut down properly");
+}
+
+void win_disposeShaderRegister(WindowData *const win) {
+    llog(INFO, "Disposing shaders' sources");
+    for (int i = 0; i < win->shaderRegister->shaderCount; ++i) {
+        void *ptr = (void *) win->shaderRegister->shaders[i].source;
+    }
+    free(win->shaderRegister->shaderFilenames);
+    free(win->shaderRegister->shaders);
+    free((void *)win->shaderRegister->shaderDirectory);
+    free(win->shaderRegister);
+    win->shaderRegister = NULL;
+}
+
+void win_disposeAndAbort(WindowData *const win) {
+    llog(FATAL, "Aborting with unknown exception");
+    win_dispose(win);
+    llog(WARN, "Application was shut down due to exception");
+    abort();
 }

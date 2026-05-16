@@ -5,7 +5,10 @@
 #include <sys/time.h>
 
 const char *const INFO = GREEN_C "INFO" RESET_C;
+const char *const DEBUG = BLUE_C "DEBUG" RESET_C;
+const char *const WARN = YELLOW_C "WARN" RESET_C;
 const char *const ERROR = RED_C "ERROR" RESET_C;
+const char *const FATAL = PURPLE_C "FATAL" RESET_C;
 
 void glog(const char *const level, const char *const format, const char *const module, va_list args) {
     time_t rawTime;
