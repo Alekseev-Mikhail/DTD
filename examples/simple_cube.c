@@ -4,10 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "window.h"
-#include "math/rad.h"
-#include "utility/exception.h"
-#include "utility/log.h"
+#include "../src/window.h"
+#include "../src/math/rad.h"
+#include "../src/utility/exception.h"
+#include "../src/utility/log.h"
 
 static const char DEFAULT_ARGUMENTS_NUMBER = 1;
 
