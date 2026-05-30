@@ -28,8 +28,6 @@ add_executable(simple_cube
         src/math/rad.c
         src/math/rad.h
         src/utility/exception.h
-        src/ecs/ecs.c
-        src/ecs/ecs.h
         src/utility/list.c
         src/utility/list.h
         src/utility/istdlib.c
