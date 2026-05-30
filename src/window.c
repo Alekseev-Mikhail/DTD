@@ -1,6 +1,5 @@
 #include "window.h"
 
-#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -182,13 +181,41 @@ static char *getShaderSource(WindowData *const win, const char *const filename) 
     fseek(file, 0, SEEK_END);
     const int size = (int) ftell(file);
     fseek(file, 0, SEEK_SET);
-    char *source = malloc((size + 1) * sizeof(char));
-
+    char *source = malloc(size * sizeof(char));
+    if (true == IS_NULL(source)) {
+        fclose(file);
+        llog(ERROR, "Failed to allocate memory for shader source");
+        win_disposeAndAbort(win);
+    }
     fread(source, sizeof(char), size, file);
-    source[size] = '\0';
+
+    // why are there so much null terminators at the end of a shader file!!!??
+    int actualSourceSize = 0;
+    char *actualSource = NULL;
+    for (; actualSourceSize < size; actualSourceSize++) {
+        if ('\0' == source[actualSourceSize]) break;
+    }
+    actualSourceSize++;
+    actualSource = realloc(source, actualSourceSize);
+    if (NULL == actualSource) {
+        llog(ERROR, "Cannot get actual shader source");
+        return source;
+    }
+
+    // I have no freaking idea why there are garbage characters at the end of a shader file
+    for (int i = actualSourceSize - 1; i >= 0; i--) {
+        if (125 == actualSource[i]) break;
+        if (32 > actualSource[i] && actualSource[i] != '\0') {
+            actualSource[i] = 32;
+        }
+    }
+
+    // for (int i = 0; i < actualSourceSize; ++i) {
+    //     llog(DEBUG, "%u", actualSource[i]);
+    // }
 
     fclose(file);
-    return source;
+    return actualSource;
 }
 
 void win_compileShaders(WindowData *const win) {
@@ -332,10 +359,10 @@ void win_startRenderCycle(const WindowData *const win) {
 
 void win_dispose(WindowData *const win) {
     if (true == IS_NULL(win)) {
-        llog(FATAL, "CRITICAL: windows object pointer is NULL when disposing it");
+        llog(FATAL, "CRITICAL: window's pointer is NULL");
         abort();
     }
-    if (win->shaderRegister != NULL) win_disposeShaderRegister(win);
+    if (NULL != win->shaderRegister) win_disposeShaderRegister(win);
     glfwDestroyWindow(win->id);
     cam_dispose(win->camera);
     free(win);
@@ -346,6 +373,7 @@ void win_disposeShaderRegister(WindowData *const win) {
     llog(INFO, "Disposing shaders' sources");
     for (int i = 0; i < win->shaderRegister->shaderCount; ++i) {
         void *ptr = (void *) win->shaderRegister->shaders[i].source;
+        free(ptr);
     }
     free(win->shaderRegister->shaderFilenames);
     free(win->shaderRegister->shaders);

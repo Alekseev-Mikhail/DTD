@@ -13,6 +13,8 @@ static const char DEFAULT_ARGUMENTS_NUMBER = 1;
 
 void intiShaderRegister(WindowData *win, int argc, char **argv);
 
+void registerAndCompileShaders(WindowData *win, char **argv);
+
 bool getExeDirectoryPath(char **exeDirPath, const char *exePath);
 
 bool setDirectoryPath(WindowData *win, const char **directoryPath, const char *pathToOrigin, const char *relativePath);
@@ -28,36 +30,19 @@ static void llog(const char *const level, char *const format, ...) {
 int main(const int argc, char **argv) {
     llog(INFO, "Initializing window");
     WindowData *win = win_init(1000, 700, "Hiya, OpenGL!");
-    llog(INFO, "Initializing shader register");
-    intiShaderRegister(win, argc, argv);
 
-    if (argc < 1) {
+    if (argc < DEFAULT_ARGUMENTS_NUMBER) {
         llog(ERROR, "Not enough arguments");
         win_disposeAndAbort(win);
     }
 
-    llog(DEBUG, "Getting program arguments");
-    char *exeDirPath = NULL;
-    if (false == getExeDirectoryPath(&exeDirPath, argv[0])) {
-        llog(FATAL, "Failed to get path, where executable is located");
-        win_disposeAndAbort(win);
+    if (argc < DEFAULT_ARGUMENTS_NUMBER + 1) {
+        llog(WARN, "No shaders specified");
+    } else {
+        llog(INFO, "Initializing shader register");
+        intiShaderRegister(win, argc, argv);
+        registerAndCompileShaders(win, argv);
     }
-    llog(DEBUG, "Working directory: %s", exeDirPath);
-
-    if (false == setDirectoryPath(win, &win->shaderRegister->shaderDirectory, exeDirPath, "resources/shaders/")) {
-        llog(FATAL, "Cannot get shader directory path");
-        win_disposeAndAbort(win);
-    }
-    llog(DEBUG, "Shaders directory: %s", win->shaderRegister->shaderDirectory);
-    free(exeDirPath);
-
-    llog(INFO, "Registering and compiling shaders");
-    llog(DEBUG, "Registering shaders");
-    win_registerShaders(win);
-    llog(DEBUG, "Compiling shaders");
-    win_compileShaders(win);
-    llog(INFO, "Disposing shader register");
-    win_disposeShaderRegister(win);
 
     cam_setPrefs(win->camera, toRad(75), 0.1f, 100.0f);
     cam_move(win->camera, -3, 3, -3);
@@ -91,7 +76,32 @@ void intiShaderRegister(WindowData *const win, const int argc, char **argv) {
         win->shaderRegister->shaderFilenames[i] = argv[DEFAULT_ARGUMENTS_NUMBER + i];
     }
 
-    win->shaderRegister->shaders = malloc(win->shaderRegister->shaderCount * sizeof(Shader));
+    win->shaderRegister->shaders = calloc(win->shaderRegister->shaderCount, sizeof(Shader));
+}
+
+void registerAndCompileShaders(WindowData *const win, char **argv) {
+    llog(DEBUG, "Getting program arguments");
+    char *exeDirPath = NULL;
+    if (false == getExeDirectoryPath(&exeDirPath, argv[0])) {
+        llog(FATAL, "Failed to get path, where executable is located");
+        win_disposeAndAbort(win);
+    }
+    llog(DEBUG, "Working directory: %s", exeDirPath);
+
+    if (false == setDirectoryPath(win, &win->shaderRegister->shaderDirectory, exeDirPath, "resources/shaders/")) {
+        llog(FATAL, "Cannot get shader directory path");
+        win_disposeAndAbort(win);
+    }
+    llog(DEBUG, "Shaders directory: %s", win->shaderRegister->shaderDirectory);
+    free(exeDirPath);
+
+    llog(INFO, "Registering and compiling shaders");
+    llog(DEBUG, "Registering shaders");
+    win_registerShaders(win);
+    llog(DEBUG, "Compiling shaders");
+    win_compileShaders(win);
+    llog(INFO, "Disposing shader register");
+    win_disposeShaderRegister(win);
 }
 
 bool getExeDirectoryPath(char **const exeDirPath, const char *const exePath) {

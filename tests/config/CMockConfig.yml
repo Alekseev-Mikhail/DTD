@@ -1,0 +1,6 @@
+:cmock:
+  :mock_path: ../gen/mocks
+  :mock_prefix: mock_
+  :plugins:
+    - expect_any_args
+    - ignore
