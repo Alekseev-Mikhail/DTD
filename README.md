@@ -10,7 +10,7 @@ ruby auto/generate_test_runner.rb test/test_list.c gen/test_list.c
 ```
 Generate mocks: <br>
 ```shell
-ruby auto/generate_test_runner.rb test/test_list_stdlib_mock.c gen/test_list_stdlib_mock.c
+ruby auto/cmock.rb -o"config/CMockConfig.yml" ../src/utility/istdlib.h 
 ```
 
 ## Examples

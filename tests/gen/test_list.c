@@ -23,6 +23,9 @@ extern void test_addElement_exceedingCapacity_shouldAddAndExpand();
 extern void test_addElement_exceedingCapacityAndRealloctionFails_shouldFail();
 extern void test_addElement_nullPointerToList_shouldFail();
 extern void test_addElement_listIsNotInitialized_shouldFail();
+extern void test_removeElement_withoutExceedingThreshold_shouldRemoveWithoutShrinking();
+extern void test_removeElement_exceedingThreshold_shouldRemoveAndShrink();
+extern void test_removeElement_withZeroSize_shouldDoNothing();
 
 
 /*=======Mock Management=====*/
@@ -105,6 +108,9 @@ int main(void)
   run_test(test_addElement_exceedingCapacityAndRealloctionFails_shouldFail, "test_addElement_exceedingCapacityAndRealloctionFails_shouldFail", 128);
   run_test(test_addElement_nullPointerToList_shouldFail, "test_addElement_nullPointerToList_shouldFail", 148);
   run_test(test_addElement_listIsNotInitialized_shouldFail, "test_addElement_listIsNotInitialized_shouldFail", 154);
+  run_test(test_removeElement_withoutExceedingThreshold_shouldRemoveWithoutShrinking, "test_removeElement_withoutExceedingThreshold_shouldRemoveWithoutShrinking", 162);
+  run_test(test_removeElement_exceedingThreshold_shouldRemoveAndShrink, "test_removeElement_exceedingThreshold_shouldRemoveAndShrink", 165);
+  run_test(test_removeElement_withZeroSize_shouldDoNothing, "test_removeElement_withZeroSize_shouldDoNothing", 168);
 
   CMock_Guts_MemFreeFinal();
   return UNITY_END();

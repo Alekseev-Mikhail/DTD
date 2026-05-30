@@ -3,6 +3,7 @@
 #define _MOCK_ISTDLIB_H
 
 #include "unity.h"
+#include "istdlib.h"
 
 /* Ignore the following warnings, since we are copying code */
 #if defined(__GNUC__) && !defined(__ICC) && !defined(__TMS470__)
