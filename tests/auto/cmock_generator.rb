@@ -157,11 +157,6 @@ class CMockGenerator
     file << "#ifndef _#{define_name}_H\n"
     file << "#define _#{define_name}_H\n\n"
     file << "#include \"#{@framework}.h\"\n"
-    @includes_h_pre_orig_header.each { |inc| file << "#include #{inc}\n" }
-    file << "#{@config.orig_header_include_fmt.gsub(/%s/, orig_filename.to_s)}\n"
-    @includes_h_post_orig_header.each { |inc| file << "#include #{inc}\n" }
-    plugin_includes = @plugins.run(:include_files)
-    file << plugin_includes unless plugin_includes.empty?
     file << "\n"
     file << "/* Ignore the following warnings, since we are copying code */\n"
     file << "#if defined(__GNUC__) && !defined(__ICC) && !defined(__TMS470__)\n"
