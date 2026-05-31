@@ -210,10 +210,6 @@ static char *getShaderSource(WindowData *const win, const char *const filename) 
         }
     }
 
-    // for (int i = 0; i < actualSourceSize; ++i) {
-    //     llog(DEBUG, "%u", actualSource[i]);
-    // }
-
     fclose(file);
     return actualSource;
 }

@@ -25,7 +25,16 @@ extern void test_addElement_nullPointerToList_shouldFail();
 extern void test_addElement_listIsNotInitialized_shouldFail();
 extern void test_removeElement_withoutExceedingThreshold_shouldRemoveWithoutShrinking();
 extern void test_removeElement_exceedingThreshold_shouldRemoveAndShrink();
-extern void test_removeElement_withZeroSize_shouldDoNothing();
+extern void test_removeElement_zeroSize_shouldDoNothing();
+extern void test_removeElement_outOfBounds_shouldFail();
+extern void test_removeElement_listIsNull_shouldFail();
+extern void test_removeElement_initiallySizeIsThree_shouldNotShrink();
+extern void test_removeElement_initiallyCapacityIsFourAndSizeIsTwo_shouldShrink();
+extern void test_removeElement_gapIsFormed_shouldMoveOtherElements();
+extern void test_removeElement_shrinkingFails_shouldFail();
+extern void test_getElement_valid_shouldReturnElement();
+extern void test_getElement_outOfBounds_shouldFail();
+extern void test_getElement_listIsNull_shouldFail();
 
 
 /*=======Mock Management=====*/
@@ -109,8 +118,17 @@ int main(void)
   run_test(test_addElement_nullPointerToList_shouldFail, "test_addElement_nullPointerToList_shouldFail", 148);
   run_test(test_addElement_listIsNotInitialized_shouldFail, "test_addElement_listIsNotInitialized_shouldFail", 154);
   run_test(test_removeElement_withoutExceedingThreshold_shouldRemoveWithoutShrinking, "test_removeElement_withoutExceedingThreshold_shouldRemoveWithoutShrinking", 162);
-  run_test(test_removeElement_exceedingThreshold_shouldRemoveAndShrink, "test_removeElement_exceedingThreshold_shouldRemoveAndShrink", 165);
-  run_test(test_removeElement_withZeroSize_shouldDoNothing, "test_removeElement_withZeroSize_shouldDoNothing", 168);
+  run_test(test_removeElement_exceedingThreshold_shouldRemoveAndShrink, "test_removeElement_exceedingThreshold_shouldRemoveAndShrink", 178);
+  run_test(test_removeElement_zeroSize_shouldDoNothing, "test_removeElement_zeroSize_shouldDoNothing", 197);
+  run_test(test_removeElement_outOfBounds_shouldFail, "test_removeElement_outOfBounds_shouldFail", 213);
+  run_test(test_removeElement_listIsNull_shouldFail, "test_removeElement_listIsNull_shouldFail", 232);
+  run_test(test_removeElement_initiallySizeIsThree_shouldNotShrink, "test_removeElement_initiallySizeIsThree_shouldNotShrink", 238);
+  run_test(test_removeElement_initiallyCapacityIsFourAndSizeIsTwo_shouldShrink, "test_removeElement_initiallyCapacityIsFourAndSizeIsTwo_shouldShrink", 255);
+  run_test(test_removeElement_gapIsFormed_shouldMoveOtherElements, "test_removeElement_gapIsFormed_shouldMoveOtherElements", 274);
+  run_test(test_removeElement_shrinkingFails_shouldFail, "test_removeElement_shrinkingFails_shouldFail", 301);
+  run_test(test_getElement_valid_shouldReturnElement, "test_getElement_valid_shouldReturnElement", 319);
+  run_test(test_getElement_outOfBounds_shouldFail, "test_getElement_outOfBounds_shouldFail", 343);
+  run_test(test_getElement_listIsNull_shouldFail, "test_getElement_listIsNull_shouldFail", 360);
 
   CMock_Guts_MemFreeFinal();
   return UNITY_END();
