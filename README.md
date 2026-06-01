@@ -23,3 +23,10 @@ Windows: <br>
 ```shell
 .\gen.bat
 ```
+
+Configure build tools.
+```
+cmake . -B build
+```
+
+If using terminal based text editor consider adding `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`.
