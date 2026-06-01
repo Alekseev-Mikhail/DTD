@@ -5,12 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "glad/glad.h"
-#include "GLFW/glfw3.h"
 #include "math/matrix.h"
 #include "math/rad.h"
 #include "utility/exception.h"
 #include "utility/log.h"
+#include <errno.h>
 
 static GLenum getShaderType(WindowData *win, const char *filename);
 
